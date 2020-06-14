@@ -1,0 +1,146 @@
+name: CI
+
+on:
+  pull_request:
+    branches:
+      - 'master'
+
+env:
+  PROJECT_ID: ${{ secrets.RUN_PROJECT_CI }}
+  RUN_REGION: us-central1
+  PR_NUMBER: ${{ github.event.number }}
+
+jobs:
+  code-health:
+    name: Code Health
+    runs-on: ubuntu-latest
+    steps:
+      - name: Setup - Checkout
+        uses: actions/checkout@v2
+
+      - name: Setup - Cache vendor
+        uses: actions/cache@v2
+        with:
+          path: vendor
+          key: vendor-ci-${{ hashFiles('composer.lock') }}
+
+      - name: Setup - GoogleCloud
+        uses: GoogleCloudPlatform/github-actions/setup-gcloud@master
+        with:
+          version: '290.0.1'
+          service_account_key: ${{ secrets.RUN_SA_KEY_CI }}
+          project_id: ${{ secrets.RUN_PROJECT_CI }}
+
+      - name: Setup - Docker
+        run: gcloud auth configure-docker
+
+      - name: Setup - Build testing image
+        run: docker-compose -f docker-compose.ci.yml build composer
+        env:
+          GITHUB_TOKEN: ${{ secrets.MY_TOKEN }}
+          DOCKER_BUILDKIT: 1
+          COMPOSE_DOCKER_CLI_BUILD: 1
+
+      - name: CI - Lint check
+        run: docker-compose -f docker-compose.ci.yml run --rm composer lint:check
+
+      - name: CI - Security check
+        run: docker-compose -f docker-compose.ci.yml run --rm composer security-check
+
+      - name: CI - Static Analysis
+        run: docker-compose -f docker-compose.ci.yml run --rm composer static-analysis
+
+      - name: Cleanup - Extract vendor for caching
+        run: |-
+          docker create -ti --name extractor ci_image bash; \
+          sudo docker cp extractor:/application/vendor vendor; \
+          docker rm -v extractor
+
+
+  unit-tests:
+    name: Unit tests
+    runs-on: ubuntu-latest
+    steps:
+      - name: Setup - Checkout
+        uses: actions/checkout@v2
+
+      - name: Setup - Cache vendor
+        uses: actions/cache@v2
+        with:
+          path: vendor
+          key: vendor-ci-${{ hashFiles('composer.lock') }}
+
+      - name: Setup - GoogleCloud
+        uses: GoogleCloudPlatform/github-actions/setup-gcloud@master
+        with:
+          version: '290.0.1'
+          service_account_key: ${{ secrets.RUN_SA_KEY_CI }}
+          project_id: ${{ secrets.RUN_PROJECT_CI }}
+
+      - name: Setup - Docker
+        run: gcloud auth configure-docker
+
+      - name: Setup - Build testing image
+        run: docker-compose -f docker-compose.ci.yml build composer
+        env:
+          GITHUB_TOKEN: ${{ secrets.MY_TOKEN }}
+          DOCKER_BUILDKIT: 1
+
+      - name: CI - Unit tests + Coverage
+        run: docker-compose -f docker-compose.ci.yml run --rm composer test:unit:check
+
+      - name: CI - Mutation tests
+        run: docker-compose -f docker-compose.ci.yml run --rm composer test:mutation:ci
+
+      - name: Cleanup - Extract vendor for caching
+        run: |-
+          docker create -ti --name extractor ci_image bash; \
+          sudo docker cp extractor:/application/vendor vendor; \
+          docker rm -v extractor
+
+
+  continuous-deployment:
+    name: Ci Deployment
+    runs-on: ubuntu-latest
+    needs:
+      - code-health
+      - unit-tests
+    steps:
+      - name: Setup - Checkout
+        uses: actions/checkout@v2
+
+      - name: Setup - Cache vendor
+        uses: actions/cache@v2
+        with:
+          path: vendor
+          key: vendor-deployable-${{ hashFiles('composer.lock') }}
+
+      - name: Setup - GoogleCloud
+        uses: GoogleCloudPlatform/github-actions/setup-gcloud@master
+        with:
+          version: '290.0.1'
+          service_account_key: ${{ secrets.RUN_SA_KEY_CI }}
+          project_id: ${{ secrets.RUN_PROJECT_CI }}
+
+      - name: Setup - Docker
+        run: gcloud auth configure-docker
+
+      - name: Build deployable image
+        run: docker-compose -f docker-compose.ci.yml build app
+        env:
+          GITHUB_TOKEN: ${{ secrets.MY_TOKEN }}
+          DOCKER_BUILDKIT: 1
+          COMPOSE_DOCKER_CLI_BUILD: 1
+
+      - name: Push deployable image
+        run: docker push gcr.io/$PROJECT_ID/foo_app_ci:$PR_NUMBER
+
+      - name: Deploy deployable image
+        run: |-
+          gcloud run deploy "foo-app-$PR_NUMBER" \
+            --quiet \
+            --region "$RUN_REGION" \
+            --image "gcr.io/$PROJECT_ID/foo_app_ci:$PR_NUMBER" \
+            --platform "managed" \
+            --allow-unauthenticated \
+            --set-env-vars AUTH_URI="http://ci.api.project.com"

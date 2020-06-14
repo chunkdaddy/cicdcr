@@ -1,0 +1,38 @@
+name: CI - Cleanup
+
+on:
+  pull_request:
+    types: [closed]
+    branches:
+      - 'master'
+
+env:
+  PROJECT_ID: ${{ secrets.RUN_PROJECT_CI }}
+  RUN_REGION: us-central1
+  PR_NUMBER: ${{ github.event.number }}
+
+jobs:
+  remove-resources:
+    name: Remove resources
+    runs-on: ubuntu-latest
+    steps:
+      - name: Setup - Checkout
+        uses: actions/checkout@v2
+
+      - name: Setup - GoogleCloud
+        uses: GoogleCloudPlatform/github-actions/setup-gcloud@master
+        with:
+          version: '290.0.1'
+          service_account_key: ${{ secrets.RUN_SA_KEY_CI }}
+          project_id: ${{ secrets.RUN_PROJECT_CI }}
+
+      - name: Remove Cloud Run instance used by PR
+        run: |-
+          gcloud run services delete "foo-app-$PR_NUMBER" \
+            --quiet \
+            --region "$RUN_REGION" \
+            --platform "managed"
+
+      - name: Remove container registry image used by PR
+        run: |-
+          gcloud container images delete "gcr.io/$PROJECT_ID/foo_app_ci:$PR_NUMBER"

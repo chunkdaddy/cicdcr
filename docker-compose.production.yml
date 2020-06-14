@@ -1,0 +1,15 @@
+version: '3.7'
+services:
+  app:
+    container_name: foo_app
+    build:
+      context: ./
+      dockerfile: docker/cr/Dockerfile
+      target: http_deploy
+      args:
+        GITHUB_TOKEN: ${GITHUB_TOKEN}
+        PROJECT_ID: gcp-project-production
+    image: gcr.io/gcp-project-production/foo_app
+    ports:
+      - "8080:8080"
+

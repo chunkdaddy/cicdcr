@@ -1,0 +1,43 @@
+version: '3.7'
+services:
+  php-cs-fixer:
+    build:
+      context: ./
+      dockerfile: docker/cr/Dockerfile
+      target: base
+      args:
+        PROJECT_ID: gcp-project-ci
+    init: true
+    volumes:
+      - .:/application:delegated
+    entrypoint: vendor/bin/php-cs-fixer
+    command: fix --verbose --show-progress=estimating
+
+  composer:
+    build:
+      context: ./
+      dockerfile: docker/cr/Dockerfile
+      target: base
+      args:
+        PROJECT_ID: gcp-project-ci
+    init: true
+    volumes:
+      - .:/application:delegated
+      - composer-cache:/root/.composer/cache:cached
+      - ${COMPOSER_HOME:-~/.composer}/auth.json:/root/.composer/auth.json:cached
+    entrypoint:
+      - composer
+
+  php:
+    build:
+      context: ./
+      dockerfile: docker/cr/Dockerfile
+      target: base
+      args:
+        PROJECT_ID: gcp-project-ci
+    init: true
+    volumes:
+      - .:/application:delegated
+
+volumes:
+  composer-cache: ~

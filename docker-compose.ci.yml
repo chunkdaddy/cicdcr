@@ -1,0 +1,28 @@
+version: '3.7'
+services:
+  app:
+    container_name: foo_app
+    build:
+      context: ./
+      dockerfile: docker/cr/Dockerfile
+      target: http_deploy
+      args:
+        GITHUB_TOKEN: ${GITHUB_TOKEN}
+        PROJECT_ID: gcp-project-ci
+    image: gcr.io/gcp-project-ci/foo_app_ci:${PR_NUMBER}
+    ports:
+      - "8080:8080"
+  composer:
+    build:
+      context: ./
+      dockerfile: docker/cr/Dockerfile
+      target: testing
+      args:
+        GITHUB_TOKEN: ${GITHUB_TOKEN}
+        PROJECT_ID: gcp-project-ci
+    image: ci_image
+    entrypoint:
+      - composer
+    volumes:
+      - .:/application:delegated
+      - /application/vendor

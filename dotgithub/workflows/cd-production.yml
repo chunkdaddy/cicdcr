@@ -1,0 +1,56 @@
+name: Continuous Deployment Production
+
+on:
+  pull_request:
+    types: [closed]
+    branches:
+      - master
+
+env:
+  PROJECT_ID: ${{ secrets.RUN_PROJECT_PRODUCTION }}
+  RUN_REGION: us-central1
+  SERVICE_NAME: foo
+
+jobs:
+  continuous-deployment:
+    name: Continuous Deployment
+    runs-on: ubuntu-latest
+    if: github.event.pull_request.merged
+    steps:
+      - name: Setup - Checkout
+        uses: actions/checkout@v2
+
+      - name: Setup - Cache vendor
+        uses: actions/cache@v2
+        with:
+          path: vendor
+          key: vendor-deployable-${{ hashFiles('composer.lock') }}
+
+      - name: Setup - GoogleCloud
+        uses: GoogleCloudPlatform/github-actions/setup-gcloud@master
+        with:
+          version: '290.0.1'
+          service_account_key: ${{ secrets.RUN_SA_KEY_PRODUCTION }}
+          project_id: ${{ secrets.RUN_PROJECT_PRODUCTION }}
+
+      - name: Setup - Docker
+        run: gcloud auth configure-docker
+
+      - name: Build deployable image
+        run: docker-compose -f docker-compose.production.yml build app
+        env:
+          GITHUB_TOKEN: ${{ secrets.MY_TOKEN }}
+          DOCKER_BUILDKIT: 1
+          COMPOSE_DOCKER_CLI_BUILD: 1
+
+      - name: Push deployable image
+        run: docker push gcr.io/$PROJECT_ID/foo_app
+
+      - name: Deploy deployable image
+        run: |-
+          gcloud run deploy "$SERVICE_NAME" \
+            --quiet \
+            --region "$RUN_REGION" \
+            --image "gcr.io/$PROJECT_ID/foo_app:latest" \
+            --platform "managed" \
+            --allow-unauthenticated

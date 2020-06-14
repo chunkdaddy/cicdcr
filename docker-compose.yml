@@ -1,0 +1,24 @@
+version: '3.7'
+services:
+  app:
+    container_name: foo_app
+    build:
+      context: ./
+      dockerfile: docker/cr/Dockerfile
+      target: http
+      args:
+        GITHUB_TOKEN: ${GITHUB_TOKEN}
+        PROJECT_ID: gcp-project-ci
+        PROCESS_SECRETS: "False"
+    ports:
+      - "8080:8080"
+    environment:
+      GOOGLE_APPLICATION_CREDENTIALS: /credential/foo_service_account.json
+      GOOGLE_APPLICATION_PROJECT_ID: gcp-project-ci
+      GOOGLE_APPLICATION_LOCATION_ID: global
+      APP_ENV: dev
+      AUTH_URI: "http://local.api.project.com"
+      LOG_PATH: /application/data/logs/dev.log
+    volumes:
+      - .:/application:delegated
+      - ${GCP_HOME:-~/.gcp}:/credential:cached
