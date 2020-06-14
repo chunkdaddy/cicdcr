@@ -19,6 +19,7 @@ services:
       APP_ENV: dev
       AUTH_URI: "http://local.api.project.com"
       LOG_PATH: /application/data/logs/dev.log
+      DB_PASSWORD: foopass123
     volumes:
       - .:/application:delegated
       - ${GCP_HOME:-~/.gcp}:/credential:cached

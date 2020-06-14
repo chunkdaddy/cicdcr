@@ -143,4 +143,4 @@ jobs:
             --image "gcr.io/$PROJECT_ID/foo_app_ci:$PR_NUMBER" \
             --platform "managed" \
             --allow-unauthenticated \
-            --set-env-vars AUTH_URI="http://ci.api.project.com"
+            --set-env-vars DB_PASSWORD="sm://gcp-project-ci/foo-db-password"
