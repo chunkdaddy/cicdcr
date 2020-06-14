@@ -17,7 +17,6 @@ services:
       GOOGLE_APPLICATION_PROJECT_ID: gcp-project-ci
       GOOGLE_APPLICATION_LOCATION_ID: global
       APP_ENV: dev
-      AUTH_URI: "http://local.api.project.com"
       LOG_PATH: /application/data/logs/dev.log
       DB_PASSWORD: foopass123
     volumes:
