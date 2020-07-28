@@ -14,10 +14,11 @@ FROM base AS http
 EXPOSE 8080
 COPY docker/cr/entrypoint.sh /entrypoint.sh
 RUN apt-get update -qq && \
-    apt-get install -qq nginx && \
+    apt-get install -qq nginx supervisor && \
     chmod 775 /entrypoint.sh && \
     mkdir /credential && chmod 700 /credential && \
     chown -R www-data:www-data /application/
+COPY docker/cr/supervisord.conf /etc/supervisord.conf
 COPY docker/cr/nginx/application.conf /etc/nginx/sites-enabled/default
 COPY docker/cr/php/overrides.conf /usr/local/etc/php-fpm.d/zzz-overrides.conf
 COPY --from=gcr.io/berglas/berglas:latest /bin/berglas /bin/berglas
